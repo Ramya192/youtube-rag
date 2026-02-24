@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from rag import ingest_video, query_video
+from backend.rag import ingest_video, query_video
 
 app = FastAPI(title="YouTube RAG API")
 
