@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy import text
 from youtube_transcript_api import YouTubeTranscriptApi
-from backend.database import engine
+from database import engine
 
 # Load environment variables
 load_dotenv()
