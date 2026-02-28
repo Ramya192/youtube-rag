@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube RAG Demo</title>
+    <style>
+        body { font-family: Arial; max-width: 700px; margin: 40px auto; }
+        input, textarea { width: 100%; padding: 8px; margin: 8px 0; }
+        button { padding: 10px 20px; }
+        .answer { margin-top: 20px; padding: 10px; background: #f4f4f4; }
+    </style>
+</head>
+<body>
+
+<h2>YouTube RAG Demo</h2>
+
+<label>Video ID:</label>
+<input id="videoId" value="osKyvYJ3PRM" />
+
+<label>Question:</label>
+<textarea id="question">What are LLMs?</textarea>
+
+<button onclick="ask()">Ask</button>
+
+<div class="answer" id="result"></div>
+
+<script>
+async function ask() {
+    const videoId = document.getElementById("videoId").value;
+    const question = document.getElementById("question").value;
+
+    const response = await fetch("/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            video_id: videoId,
+            question: question
+        })
+    });
+
+    const data = await response.json();
+
+    document.getElementById("result").innerHTML = `
+        <strong>Answer:</strong><br>${data.answer}<br><br>
+        <strong>Confidence:</strong> ${data.confidence}<br><br>
+        <a href="${data.top_match.youtube_link}" target="_blank">
+            Jump to Timestamp
+        </a>
+    `;
+}
+</script>
+
+</body>
+</html>
