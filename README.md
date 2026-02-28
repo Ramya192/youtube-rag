@@ -14,9 +14,35 @@ Features
 ✅ Production-ready query-only API
 ✅ Clean relational database design
 
+Production Design Decisions
+
+Ingestion disabled in production to prevent abuse and cost spikes
+
+Query endpoint rate-limited (10 requests/minute)
+
+Vector search uses cosine similarity via pgvector
+
+Retrieval thresholding prevents irrelevant LLM calls
+
+Debug mode optional for development
+
+
+Why Ingestion Is Local
+
+Transcript fetching from cloud IPs can be blocked by YouTube.
+Therefore ingestion runs locally, while production remains query-only and stateless.
+
 Architecture
 User → FastAPI → Embedding → pgvector similarity search
       → Metadata JOIN → Context construction → LLM → Structured Response
+
+Local Ingestion (Transcript + Embeddings)
+        ↓
+Supabase (PostgreSQL + pgvector)
+        ↓
+Render (Stateless Query API)
+        ↓
+OpenAI (Answer Generation)
       
 This system separates ingestion from serving.
 
