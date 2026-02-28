@@ -1,3 +1,4 @@
+from importlib.metadata import metadata
 import os
 import tiktoken
 from dotenv import load_dotenv
@@ -5,6 +6,7 @@ from openai import OpenAI
 from sqlalchemy import text
 from youtube_transcript_api import YouTubeTranscriptApi
 from backend.database import engine
+from .youtube_api import get_video_metadata
 
 # Load environment variables
 load_dotenv()
@@ -34,6 +36,11 @@ def extract_video_id(url: str) -> str:
 # ---------------------------------------
 def ingest_video(url: str):
 
+    metadata = get_video_metadata(video_id)
+
+    if not metadata:
+        raise ValueError("Invalid or unavailable video")
+    
     video_id = extract_video_id(url)
 
     transcript = YouTubeTranscriptApi().fetch(video_id)
@@ -43,6 +50,13 @@ def ingest_video(url: str):
     texts = [chunk["text"] for chunk in chunks]
 
     embeddings = create_embeddings_batch(texts)
+
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO videos (id, title, description, channel, published_at, views)
+            VALUES (:id, :title, :description, :channel, :published_at, :views)
+            ON CONFLICT (id) DO NOTHING;
+        """), metadata)
 
     with engine.begin() as conn:
 
