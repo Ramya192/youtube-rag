@@ -1,18 +1,22 @@
 from fastapi import FastAPI
+from fastapi import Request
+from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from backend.rag import ingest_video, query_video
-import os
 from fastapi import HTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
+import os
 
 app = FastAPI()
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 
+app.add_middleware(SlowAPIMiddleware)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
 
@@ -38,11 +42,12 @@ if ENVIRONMENT != "production":
 
 @app.post("/query")
 @limiter.limit("10/minute")
-def query(request: QueryRequest):
-    return query_video(request.question, request.video_id, request.debug)
+def query(request: Request, body: QueryRequest):
+    return query_video(body.question, body.video_id)
+
 
 @app.exception_handler(RateLimitExceeded)
-def rate_limit_handler(request, exc):
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
         content={"detail": "Rate limit exceeded. Try again later."},
