@@ -318,3 +318,14 @@ def query_video(question: str, video_id: str = None, debug: bool = False):
         response["retrieved_chunks"] = top_chunks
 
     return response
+
+def get_all_videos():
+    with engine.connect() as conn:
+        results = conn.execute(
+            text("SELECT id, title FROM videos ORDER BY published_at DESC")
+        ).fetchall()
+
+    return [
+        {"video_id": row.id, "title": row.title}
+        for row in results
+    ]

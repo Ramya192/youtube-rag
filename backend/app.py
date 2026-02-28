@@ -11,6 +11,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from backend.rag import ingest_video, query_video, get_all_videos
 import os
 
 app = FastAPI(title="YouTube RAG API")
@@ -52,3 +53,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         status_code=429,
         content={"detail": "Rate limit exceeded. Try again later."},
     )
+
+@app.get("/videos")
+def list_videos():
+    return get_all_videos()
