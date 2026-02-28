@@ -1,5 +1,8 @@
 from importlib.metadata import metadata
+from multiprocessing.util import debug
 import os
+from urllib import response
+from fastapi import params
 import tiktoken
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -25,10 +28,13 @@ def create_embeddings_batch(texts: list[str]):
 # ---------------------------------------
 # Helper: Extract video ID
 # ---------------------------------------
-def extract_video_id(url: str) -> str:
-    if "v=" in url:
-        return url.split("v=")[1].split("&")[0]
-    return url
+def extract_video_id(url: str):
+    if "watch?v=" in url:
+        return url.split("watch?v=")[1].split("&")[0]
+    elif "youtu.be/" in url:
+        return url.split("youtu.be/")[1].split("?")[0]
+    else:
+        raise ValueError("Invalid YouTube URL")
 
 
 # ---------------------------------------
@@ -36,12 +42,12 @@ def extract_video_id(url: str) -> str:
 # ---------------------------------------
 def ingest_video(url: str):
 
+    video_id = extract_video_id(url)
+
     metadata = get_video_metadata(video_id)
 
     if not metadata:
         raise ValueError("Invalid or unavailable video")
-    
-    video_id = extract_video_id(url)
 
     transcript = YouTubeTranscriptApi().fetch(video_id)
 
@@ -52,11 +58,16 @@ def ingest_video(url: str):
     embeddings = create_embeddings_batch(texts)
 
     with engine.begin() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text(
+                """
             INSERT INTO videos (id, title, description, channel, published_at, views)
             VALUES (:id, :title, :description, :channel, :published_at, :views)
             ON CONFLICT (id) DO NOTHING;
-        """), metadata)
+        """
+            ),
+            metadata,
+        )
 
     with engine.begin() as conn:
 
@@ -160,57 +171,116 @@ def build_chunks(transcript, max_tokens=800, overlap_tokens=100):
 # ---------------------------------------
 # Query Video
 # ---------------------------------------
-def query_video(question: str, video_id: str):
+def query_video(question: str, video_id: str = None, debug: bool = False):
 
     # 1️⃣ Embed question
     query_embedding = create_embeddings_batch([question])[0]
     vector_str = "[" + ",".join(map(str, query_embedding)) + "]"
 
-    # 2️⃣ Retrieve top chunks
-    query_sql = """
-        SELECT content, start_time, end_time,
-               embedding <-> :query_vector AS distance
-        FROM video_chunks_with_indx
-        WHERE video_id = :video_id
-        ORDER BY embedding <-> :query_vector
+    if video_id:
+        where_clause = "WHERE c.video_id = :video_id"
+    else:
+        where_clause = ""
+
+    query_sql = f"""
+        SELECT 
+           c.content,
+           c.start_time,
+           c.end_time,
+           c.video_id,
+           v.title,
+           v.channel,
+           v.published_at,
+           c.embedding <=> :query_vector AS distance
+        FROM video_chunks_with_indx c
+        JOIN videos v ON c.video_id = v.id
+        {where_clause}
+        ORDER BY c.embedding <=> :query_vector
         LIMIT 5
     """
 
     with engine.connect() as conn:
-        results = conn.execute(
-            text(query_sql), {"query_vector": vector_str, "video_id": video_id}
-        ).fetchall()
+
+        # Build parameters dynamically
+        params = {"query_vector": vector_str}
+
+        if video_id:
+            params["video_id"] = video_id
+
+        results = conn.execute(text(query_sql), params).fetchall()
 
     if not results:
-        return {"answer": "No relevant content found."}
+        return {"answer": "No relevant content found.", "confidence": "none"}
 
-    # 3️⃣ Relevance threshold
-    top_distance = results[0][3]
+    # --- Define similarity metrics FIRST ---
+    top_distance = results[0].distance
+    similarity_score = 1 - top_distance
 
-    print("Top distance:", top_distance)
+    # confidence calculation
+    if top_distance < 0.45:
+        confidence = "high"
+    elif top_distance < 0.75:
+        confidence = "medium"
+    elif top_distance < 0.95:
+        confidence = "low"
+    else:
+        confidence = "very_low"
 
-    if top_distance > 1.50:
-        return {"answer": "Question is irrelevant to this video."}
+    summary_triggers = ["what is this video about", "summarize", "summary", "overview"]
 
-    # 4️⃣ Build structured context
+    is_summary_query = any(trigger in question.lower() for trigger in summary_triggers)
+
+    # optional irrelevance guard
+    if top_distance > 0.85 and not is_summary_query:
+        return {
+            "answer": "The question appears unrelated to the video content.",
+            "confidence": "very_low",
+        }
+
+    # 3️⃣ Convert to structured chunks
+    top_chunks = []
+
+    for row in results:
+        top_chunks.append(
+            {
+                "content": row[0],
+                "start_time": row[1],
+                "end_time": row[2],
+                "video_id": row[3],
+                "title": row[4],
+                "channel": row[5],
+                "published_at": row[6],
+                "distance": row[7],
+            }
+        )
+
+    # youtube timestamp link
+    start_time = int(top_chunks[0]["start_time"])
+    matched_video_id = top_chunks[0]["video_id"]
+    youtube_link = f"https://www.youtube.com/watch?v={matched_video_id}&t={start_time}s"
+
+    # 5️⃣ Build context
     context_blocks = []
 
-    for r in results:
-        context_blocks.append(f"[{round(r[1],2)}s - {round(r[2],2)}s]\n{r[0]}")
+    for chunk in top_chunks:
+        context_blocks.append(
+            f"[{round(chunk['start_time'],2)}s - {round(chunk['end_time'],2)}s]\n{chunk['content']}"
+        )
 
     context = "\n\n".join(context_blocks)
 
-    # 5️⃣ Ask LLM with strict grounding
+    # 6️⃣ Ask LLM
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
                 "content": (
-                    "You are a strict assistant. "
-                    "Answer ONLY using the provided transcript context. "
-                    "If answer is not in context, say: "
-                    "'The question is not answered in the video.'"
+                    "You are a retrieval-grounded assistant."
+                    "Answer strictly using ONLY the transcript context provided."
+                    "If the answer cannot be found in the context, say:"
+                    "The question is not answered in the video."
+                    "Be precise and avoid assumptions."
                 ),
             },
             {
@@ -220,14 +290,28 @@ def query_video(question: str, video_id: str):
         ],
     )
 
-    return {
-        "answer": response.choices[0].message.content,
-        "sources": [
-            {
-                "start": round(r[1], 2),
-                "end": round(r[2], 2),
-                "youtube_link": f"https://www.youtube.com/watch?v={video_id}&t={int(r[1])}s",
-            }
-            for r in results
-        ],
+    answer = response.choices[0].message.content
+
+    # 7️⃣ Return enriched response
+
+    response = {
+        "answer": answer,
+        "confidence": confidence,
+        "distance": top_distance,
+        "video": {
+            "video_id": top_chunks[0]["video_id"],
+            "title": top_chunks[0]["title"],
+            "channel": top_chunks[0]["channel"],
+            "published_at": top_chunks[0]["published_at"],
+        },
+        "top_match": {
+            "start": top_chunks[0]["start_time"],
+            "end": top_chunks[0]["end_time"],
+            "youtube_link": youtube_link,
+        },
     }
+
+    if debug:
+        response["retrieved_chunks"] = top_chunks
+
+    return response

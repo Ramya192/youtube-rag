@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Optional
 from backend.rag import ingest_video, query_video
 
 app = FastAPI(title="YouTube RAG API")
@@ -11,7 +12,8 @@ class IngestRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
-    video_id: str
+    video_id: Optional[str] = None
+    debug: Optional[bool] = False
 
 
 @app.post("/ingest")
@@ -21,4 +23,4 @@ def ingest(request: IngestRequest):
 
 @app.post("/query")
 def query(request: QueryRequest):
-    return query_video(request.question, request.video_id)
+    return query_video(request.question, request.video_id, request.debug)

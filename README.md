@@ -15,7 +15,9 @@ Features
 ✅ Clean relational database design
 
 Architecture
-
+User → FastAPI → Embedding → pgvector similarity search
+      → Metadata JOIN → Context construction → LLM → Structured Response
+      
 This system separates ingestion from serving.
 
 🔹 Local Ingestion Layer (ETL)
