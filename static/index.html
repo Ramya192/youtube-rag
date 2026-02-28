@@ -1,53 +1,154 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>YouTube RAG Demo</title>
     <style>
-        body { font-family: Arial; max-width: 700px; margin: 40px auto; }
-        input, textarea { width: 100%; padding: 8px; margin: 8px 0; }
-        button { padding: 10px 20px; }
-        .answer { margin-top: 20px; padding: 10px; background: #f4f4f4; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin-bottom: 30px;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 6px;
+            border: none;
+            background-color: #111;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #333;
+        }
+
+        .answer-box {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .confidence {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        a {
+            color: #1a73e8;
+        }
     </style>
 </head>
+
 <body>
 
-<h2>YouTube RAG Demo</h2>
+    <div class="container">
+        <h1>YouTube RAG Demo</h1>
 
-<label>Video ID:</label>
-<input id="videoId" value="osKyvYJ3PRM" />
+        <label>Select Video</label>
+        <select id="videoId"></select>
 
-<label>Question:</label>
-<textarea id="question">What are LLMs?</textarea>
+        <label>Question</label>
+        <textarea id="question" placeholder="Ask something about the video..."></textarea>
 
-<button onclick="ask()">Ask</button>
+        <button onclick="ask()">Ask</button>
 
-<div class="answer" id="result"></div>
+        <div id="result" class="answer-box" style="display:none;"></div>
+    </div>
 
-<script>
-async function ask() {
-    const videoId = document.getElementById("videoId").value;
-    const question = document.getElementById("question").value;
+    <script>
+        async function loadVideos() {
+            const response = await fetch("/videos");
+            const videos = await response.json();
 
-    const response = await fetch("/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            video_id: videoId,
-            question: question
-        })
-    });
+            const dropdown = document.getElementById("videoId");
 
-    const data = await response.json();
+            videos.forEach(video => {
+                const option = document.createElement("option");
+                option.value = video.video_id;
+                option.textContent = video.title;
+                dropdown.appendChild(option);
+            });
+        }
 
-    document.getElementById("result").innerHTML = `
-        <strong>Answer:</strong><br>${data.answer}<br><br>
-        <strong>Confidence:</strong> ${data.confidence}<br><br>
+        async function ask() {
+            const videoId = document.getElementById("videoId").value;
+            const question = document.getElementById("question").value;
+
+            const resultDiv = document.getElementById("result");
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = "Loading...";
+
+            const response = await fetch("/query", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    video_id: videoId,
+                    question: question
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                resultDiv.innerHTML = "Error: " + data.detail;
+                return;
+            }
+
+            resultDiv.innerHTML = `
+        <h3>Answer</h3>
+        <p>${data.answer}</p>
+        <div class="confidence">Confidence: ${data.confidence}</div>
+        <br>
         <a href="${data.top_match.youtube_link}" target="_blank">
             Jump to Timestamp
         </a>
     `;
-}
-</script>
+        }
+
+        window.onload = loadVideos;
+    </script>
 
 </body>
+
 </html>
