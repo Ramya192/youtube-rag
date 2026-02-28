@@ -7,11 +7,18 @@ This project demonstrates clean separation of ingestion and serving, official AP
 Live Demo
 ---------
 
+Interactive Demo UI:
+https://youtube-rag-backend-1roe.onrender.com/ui
+
 Deployed API:
 https://youtube-rag-backend-1roe.onrender.com/docs
 
 Pre-indexed demo video:
 https://www.youtube.com/watch?v=osKyvYJ3PRM
+
+⚠️ Note:
+Only pre-ingested videos are queryable.
+Ingestion is disabled in production by design.
 
 What This System Does
 ---------------------

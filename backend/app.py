@@ -13,17 +13,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 import os
 
-app = FastAPI()
+app = FastAPI(title="YouTube RAG API")
+
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
-
 app.add_middleware(SlowAPIMiddleware)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
-
-app = FastAPI(title="YouTube RAG API")
-
 
 class IngestRequest(BaseModel):
     url: str
