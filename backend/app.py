@@ -15,7 +15,7 @@ import os
 
 app = FastAPI(title="YouTube RAG API")
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/ui", StaticFiles(directory="static", html=True), name="static")
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
