@@ -4,8 +4,17 @@ A production-style Retrieval-Augmented Generation (RAG) system that enables sema
 
 This project demonstrates clean separation of ingestion and serving, official API integration, vector database usage (pgvector), production deployment practices, and infrastructure debugging.
 
-What This System Does
+Live Demo
+---------
 
+Deployed API:
+https://youtube-rag-backend-1roe.onrender.com/docs
+
+Pre-indexed demo video:
+https://www.youtube.com/watch?v=osKyvYJ3PRM
+
+What This System Does
+---------------------
 Given a YouTube video and a question, the system:
 
 1. Retrieves relevant transcript chunks using vector similarity search
@@ -14,7 +23,7 @@ Given a YouTube video and a question, the system:
 4. Returns structured metadata and timestamp links
 
 Architecture Overview
-
+---------------------
 Local Ingestion Layer (ETL)
     ↓
 Supabase (PostgreSQL + pgvector)
@@ -53,6 +62,7 @@ Stateless API that:
 8. Production does not perform ingestion.
 
 Key Engineering Decisions
+-------------------------
 1️⃣ Ingestion Disabled in Production
 
 1. Prevents abuse
@@ -84,7 +94,9 @@ Prevents:
 1. Prevents calling the LLM if similarity is too low.
 2. This reduces hallucinations and improves grounding.
 
-Database Schema for videos table
+Database Schema 
+---------------
+videos table
 Column	      Description
 id	            YouTube video ID (Primary Key)
 title	            Video title
@@ -104,6 +116,7 @@ end_time	      Chunk end timestamp
 embedding	      pgvector embedding
 
 Example Query Response
+----------------------
 {
   "answer": "...",
   "confidence": "medium",
@@ -123,7 +136,7 @@ Example Query Response
 Debug mode optionally returns retrieved chunks.
 
 Tech Stack
-
+----------
 1. Python
 2. FastAPI
 3. Supabase (PostgreSQL + pgvector)
@@ -134,6 +147,7 @@ Tech Stack
 8. SlowAPI (rate limiting)
 
 Running Locally
+---------------
 1️ Install dependencies
 pip install -r backend/requirements.txt
 

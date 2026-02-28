@@ -210,7 +210,10 @@ def query_video(question: str, video_id: str = None, debug: bool = False):
         results = conn.execute(text(query_sql), params).fetchall()
 
     if not results:
-        return {"answer": "No relevant content found.", "confidence": "none"}
+        return {
+            "answer": "This video has not been ingested yet or no relevant transcript content was found. Please ingest the video locally first.",
+            "confidence": "none",
+        }
 
     # --- Define similarity metrics FIRST ---
     top_distance = results[0].distance
