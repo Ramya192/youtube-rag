@@ -57,3 +57,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @app.get("/videos")
 def list_videos():
     return get_all_videos()
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "environment": ENVIRONMENT
+    }
