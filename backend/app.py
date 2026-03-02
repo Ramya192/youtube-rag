@@ -62,6 +62,6 @@ def list_videos():
 def root():
     return {"service": "YouTube RAG API", "status": "running"}
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok"}
