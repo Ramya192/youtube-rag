@@ -58,9 +58,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 def list_videos():
     return get_all_videos()
 
+@app.get("/")
+def root():
+    return {"service": "YouTube RAG API", "status": "running"}
+
 @app.get("/health")
 def health():
-    return {
-        "status": "ok",
-        "environment": ENVIRONMENT
-    }
+    return {"status": "ok"}
